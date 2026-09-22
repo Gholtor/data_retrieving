@@ -1,6 +1,7 @@
-# IMF Data Retrieval
+# IMF Fiscal & Macroeconomic Data Explorer
 
-This project demonstrates the working IMF SDMX flow:
+An interactive Streamlit app for discovering and retrieving IMF macroeconomic and fiscal data
+through the IMF SDMX API, with an optional iData backend for users who have IMF-authorized access.
 
 1. Fetch metadata / structure information first
 2. Inspect dataflows, dataset structures, and codelists
@@ -8,24 +9,85 @@ This project demonstrates the working IMF SDMX flow:
 
 ## Setup
 
-1. Copy `.env.example` to `.env`
-2. Set your IMF subscription key:
+### Prerequisites
+
+- [Git](https://git-scm.com/downloads) (`winget install --id Git.Git -e`)
+- [Python 3.12+](https://www.python.org/downloads/) (`winget install --id Python.Python.3.12 -e`)
+
+### Steps
+
+1. Create and activate a virtual environment:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2. Install dependencies:
+
+```powershell
+pip install -r requirements.txt
+```
+
+3. Copy `.env.example` to `.env`
+4. Set your IMF subscription key:
 
 ```env
 IMF_API_KEY=your_imf_subscription_key_here
 ```
 
-3. Activate the virtual environment:
+5. Run the Streamlit interface:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+streamlit run streamlit_app.py
 ```
 
-4. Run the client:
+The interface supports two complementary backends:
+
+- **SDMX API** uses the IMF API key and standardized dataflow/structure queries.
+- **iData** uses the IMF-approved `imf_datatools` package for iData databases such as WEO when the user has the required package and account access. That package is not included in `requirements.txt` because it is distributed through IMF-specific channels.
+
+The SDMX source selector currently includes `IMF.STA`, `IMF.RES`, `IMF.FAD`, `IMF.MCM`,
+`IMF.AFR`, `IMF.MCD`, and `IMF.WHD`. Each selection loads the dataflows exposed by that agency;
+availability of a dataflow or codelist does not guarantee observations for every country or
+period.
+
+For iData, the interface supports database search, dimension-value discovery, backend-specific
+query keys, long/wide/panel output, metadata-aware scale and unit labels, and WEO country-group
+expansion. iData uses an empty key segment for an open dimension; SDMX uses `*`.
+
+For SDMX responses, the app resolves the dataflow's referenced structure and codelists to preserve
+official dimension order and provide selectable codes. It supports multi-selection with `+`, and
+shows an advanced key mapping. WEO year inputs are inclusive and are also applied locally because
+some WEO responses include observations outside the requested bounds.
+
+Downloads contain economist-facing columns such as `COUNTRY`, `INDICATOR`, `FREQUENCY`, `TIME_PERIOD`, and `OBS_VALUE`. Internal SDMX indexes (`series_key`, `position`, and `values`) are retained only in the raw response view. CSV and Stata (`.dta`) downloads are available.
+
+Or run the command-line metadata check:
 
 ```powershell
 python imf_client.py
 ```
+
+## Tests
+
+Run the local, network-independent client tests with:
+
+```powershell
+python -m unittest -v test_clients.py
+```
+
+## User workflow
+
+For SDMX, the Streamlit interface has two network actions:
+
+1. **Fetch metadata** discovers the dataflows available to the IMF API key.
+2. **Fetch data** sends the selected dataflow, SDMX key, and period bounds, then offers CSV or Stata downloads and a raw-response view.
+
+The SDMX key must follow the dimension order defined by the selected dataset. Use `*` for an open dimension, `.` between dimensions, and `+` to select multiple values within one dimension.
+
+For iData, query keys must contain exactly one segment per discovered dimension. Use an empty
+segment for all values in a dimension and `+` to select multiple values.
 
 ## Supported flows
 
@@ -62,6 +124,7 @@ print(series)
 ## Notes
 
 - The IMF API authenticates with the `Ocp-Apim-Subscription-Key` header.
-- The API key should never be committed to GitHub.
-- The repo is ready for anyone with a valid IMF key to run it locally.
-- This project assumes the runtime environment is not blocked by local security policy.
+- Never commit `.env`, Streamlit secrets, or an actual API key. Each user must provide their own authorized key; `.env.example` is only a placeholder template.
+- iData access is separate from SDMX API access. It requires the IMF-approved `imf_datatools` distribution and an active, authorized IMF session; do not install an unofficial package or enter an IMF password into this app.
+- IMF APIs may return no observations for valid codes when that series is not available for the selected country and period. Check the warning and raw response before interpreting an empty result.
+- Network access to IMF endpoints may be restricted by local firewall, VPN, or proxy policy.
